@@ -36,17 +36,16 @@ class ClaudeAPIService {
     private let apiVersion = "2023-06-01"
     
     // API key should be stored in Config.xcconfig or environment
-    private var apiKey: String {
+    private var apiKey: String? {
         // Try to get from bundle configuration
         if let key = Bundle.main.object(forInfoDictionaryKey: "CLAUDE_API_KEY") as? String, !key.isEmpty {
             return key
         }
-        // Fallback to placeholder for development
-        return "YOUR_API_KEY_HERE"
+        return nil
     }
     
     func analyzeImage(_ image: UIImage) async throws -> String {
-        guard apiKey != "YOUR_API_KEY_HERE" else {
+        guard let apiKey = apiKey else {
             throw ClaudeAPIError.apiKeyMissing
         }
         
