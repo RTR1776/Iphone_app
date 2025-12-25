@@ -14,19 +14,35 @@ enum ClaudeAPIError: Error {
     case apiKeyMissing
     case networkError(Error)
     case decodingError(Error)
-    
+    case imageProcessingError
+    case rateLimitExceeded
+    case insufficientCredits
+
     var localizedDescription: String {
         switch self {
         case .invalidURL:
-            return "Invalid API URL"
+            return "Unable to connect to the AI service. Please try again."
         case .invalidResponse:
-            return "Invalid response from API"
+            return "Received an unexpected response. Please try again."
         case .apiKeyMissing:
-            return "API key not configured. Please add CLAUDE_API_KEY to Config.xcconfig"
+            return "API key not configured. Please check your settings and add a valid Claude API key."
         case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
+            let message = error.localizedDescription
+            if message.contains("Internet connection") {
+                return "No internet connection. Please check your network and try again."
+            } else if message.contains("timed out") {
+                return "Request timed out. Please check your connection and try again."
+            } else {
+                return "Network error occurred. Please try again."
+            }
+        case .decodingError:
+            return "Unable to process the analysis. Please try again with a different image."
+        case .imageProcessingError:
+            return "Unable to process the image. Please try taking a new photo."
+        case .rateLimitExceeded:
+            return "Too many requests. Please wait a moment and try again."
+        case .insufficientCredits:
+            return "API credits depleted. Please check your account at Anthropic."
         }
     }
 }
@@ -48,14 +64,14 @@ class ClaudeAPIService {
         guard let apiKey = apiKey else {
             throw ClaudeAPIError.apiKeyMissing
         }
-        
+
         guard let url = URL(string: apiURL) else {
             throw ClaudeAPIError.invalidURL
         }
-        
+
         // Convert image to base64
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw ClaudeAPIError.invalidResponse
+            throw ClaudeAPIError.imageProcessingError
         }
         let base64Image = imageData.base64EncodedString()
         
@@ -114,12 +130,22 @@ class ClaudeAPIService {
             
             // Handle different status codes
             guard httpResponse.statusCode == 200 else {
-                if let errorJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let error = errorJSON["error"] as? [String: Any],
-                   let message = error["message"] as? String {
-                    throw ClaudeAPIError.networkError(NSError(domain: "ClaudeAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: message]))
+                // Handle specific HTTP status codes
+                switch httpResponse.statusCode {
+                case 401:
+                    throw ClaudeAPIError.apiKeyMissing
+                case 429:
+                    throw ClaudeAPIError.rateLimitExceeded
+                case 402:
+                    throw ClaudeAPIError.insufficientCredits
+                default:
+                    if let errorJSON = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = errorJSON["error"] as? [String: Any],
+                       let message = error["message"] as? String {
+                        throw ClaudeAPIError.networkError(NSError(domain: "ClaudeAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: message]))
+                    }
+                    throw ClaudeAPIError.invalidResponse
                 }
-                throw ClaudeAPIError.invalidResponse
             }
             
             // Parse response
