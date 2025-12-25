@@ -2,6 +2,14 @@
 
 An AI-powered iPhone application that helps pawn shop owners and customers evaluate items using the Claude API. Take a photo of any item and get instant expert analysis including identification, condition assessment, and pricing estimates.
 
+## 🚀 Quick Links
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup instructions
+- **[TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)** - Architecture and implementation details
+- **[UI_MOCKUP.md](UI_MOCKUP.md)** - Interface design and user flow
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built
+
 ## Features
 
 - 📸 **Camera Integration**: Take photos directly in the app
