@@ -50,7 +50,7 @@ enum ClaudeAPIError: Error {
 class ClaudeAPIService {
     private let apiURL = "https://api.anthropic.com/v1/messages"
     private let apiVersion = "2023-06-01"
-    
+
     // API key should be stored in Config.xcconfig or environment
     private var apiKey: String? {
         // Try to get from bundle configuration
@@ -58,6 +58,150 @@ class ClaudeAPIService {
             return key
         }
         return nil
+    }
+
+    // Streaming analysis callback
+    func analyzeImageStreaming(_ image: UIImage, onUpdate: @escaping (String) -> Void) async throws -> String {
+        guard let apiKey = apiKey else {
+            throw ClaudeAPIError.apiKeyMissing
+        }
+
+        guard let url = URL(string: apiURL) else {
+            throw ClaudeAPIError.invalidURL
+        }
+
+        // Convert image to base64
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw ClaudeAPIError.imageProcessingError
+        }
+        let base64Image = imageData.base64EncodedString()
+
+        // Prepare request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+
+        // Create request body with streaming enabled
+        let requestBody: [String: Any] = [
+            "model": "claude-sonnet-4-5-20250929",
+            "max_tokens": 2048,
+            "stream": true,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": [
+                        [
+                            "type": "image",
+                            "source": [
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64Image
+                            ]
+                        ],
+                        [
+                            "type": "text",
+                            "text": """
+                            You are an expert pawn shop professional assistant. Analyze this item for a pawn shop employee/owner and provide:
+
+                            1. ITEM IDENTIFICATION
+                               - What is it? (Brand, model, type)
+                               - Key identifying features
+                               - Serial number location (if visible)
+
+                            2. AUTHENTICITY CHECK
+                               - Likelihood: Authentic / Questionable / Likely Fake
+                               - Red flags or verification points
+                               - What to inspect more closely
+
+                            3. CONDITION ASSESSMENT
+                               - Overall condition (Excellent/Good/Fair/Poor)
+                               - Specific wear, damage, or issues
+                               - Functional concerns
+
+                            4. MARKET VALUE
+                               - Current market value range
+                               - Basis for valuation (recent sales, market trends)
+
+                            5. RECOMMENDED LOAN/PURCHASE AMOUNT
+                               - Suggested pawn loan amount (typically 25-50% of market value)
+                               - Recommended purchase price if buying outright (50-70%)
+                               - Safety margin explanation
+
+                            6. PROFIT POTENTIAL
+                               - Expected resale value
+                               - Estimated profit margin
+                               - Time to sell estimate
+
+                            7. RISK FACTORS
+                               - Authentication risks
+                               - Market volatility
+                               - Legal considerations (stolen goods indicators)
+
+                            Be specific, practical, and business-focused. This is for professional pawn shop operations.
+                            """
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        // Make streaming request
+        var fullText = ""
+
+        do {
+            let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ClaudeAPIError.invalidResponse
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                throw ClaudeAPIError.invalidResponse
+            }
+
+            // Process streaming response
+            for try await line in asyncBytes.lines {
+                // Skip empty lines
+                if line.isEmpty || !line.hasPrefix("data: ") {
+                    continue
+                }
+
+                // Remove "data: " prefix
+                let jsonString = String(line.dropFirst(6))
+
+                // Skip [DONE] message
+                if jsonString == "[DONE]" {
+                    break
+                }
+
+                // Parse JSON
+                guard let jsonData = jsonString.data(using: .utf8),
+                      let event = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                    continue
+                }
+
+                // Extract text delta
+                if let type = event["type"] as? String, type == "content_block_delta",
+                   let delta = event["delta"] as? [String: Any],
+                   let text = delta["text"] as? String {
+                    fullText += text
+                    await MainActor.run {
+                        onUpdate(fullText)
+                    }
+                }
+            }
+
+            return fullText
+
+        } catch let error as ClaudeAPIError {
+            throw error
+        } catch {
+            throw ClaudeAPIError.networkError(error)
+        }
     }
     
     func analyzeImage(_ image: UIImage) async throws -> String {
@@ -84,8 +228,8 @@ class ClaudeAPIService {
         
         // Create request body
         let requestBody: [String: Any] = [
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 1024,
+            "model": "claude-sonnet-4-5-20250929",
+            "max_tokens": 2048,
             "messages": [
                 [
                     "role": "user",
@@ -101,16 +245,43 @@ class ClaudeAPIService {
                         [
                             "type": "text",
                             "text": """
-                            You are an expert pawn shop assistant. Analyze this item and provide:
-                            
-                            1. Item identification and description
-                            2. Condition assessment
-                            3. Estimated market value range
-                            4. Estimated pawn value (typically 25-60% of market value)
-                            5. Key factors affecting the price
-                            6. Tips for verification or authentication
-                            
-                            Be specific and practical in your assessment.
+                            You are an expert pawn shop professional assistant. Analyze this item for a pawn shop employee/owner and provide:
+
+                            1. ITEM IDENTIFICATION
+                               - What is it? (Brand, model, type)
+                               - Key identifying features
+                               - Serial number location (if visible)
+
+                            2. AUTHENTICITY CHECK
+                               - Likelihood: Authentic / Questionable / Likely Fake
+                               - Red flags or verification points
+                               - What to inspect more closely
+
+                            3. CONDITION ASSESSMENT
+                               - Overall condition (Excellent/Good/Fair/Poor)
+                               - Specific wear, damage, or issues
+                               - Functional concerns
+
+                            4. MARKET VALUE
+                               - Current market value range
+                               - Basis for valuation (recent sales, market trends)
+
+                            5. RECOMMENDED LOAN/PURCHASE AMOUNT
+                               - Suggested pawn loan amount (typically 25-50% of market value)
+                               - Recommended purchase price if buying outright (50-70%)
+                               - Safety margin explanation
+
+                            6. PROFIT POTENTIAL
+                               - Expected resale value
+                               - Estimated profit margin
+                               - Time to sell estimate
+
+                            7. RISK FACTORS
+                               - Authentication risks
+                               - Market volatility
+                               - Legal considerations (stolen goods indicators)
+
+                            Be specific, practical, and business-focused. This is for professional pawn shop operations.
                             """
                         ]
                     ]

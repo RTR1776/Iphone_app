@@ -22,19 +22,23 @@ class PawnShopViewModel: ObservableObject {
             errorMessage = "No image selected"
             return
         }
-        
+
         isAnalyzing = true
         errorMessage = nil
-        
+        analysisResult = "" // Clear previous result
+
         do {
-            let result = try await claudeService.analyzeImage(image)
+            // Use streaming analysis for real-time updates
+            let result = try await claudeService.analyzeImageStreaming(image) { [weak self] partialText in
+                self?.analysisResult = partialText
+            }
             analysisResult = result
             errorMessage = nil
         } catch {
             errorMessage = "Error: \(error.localizedDescription)"
             analysisResult = nil
         }
-        
+
         isAnalyzing = false
     }
     
