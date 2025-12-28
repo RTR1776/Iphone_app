@@ -16,7 +16,7 @@ class AIEnrichmentService: ObservableObject {
     @Published var currentAnalysis: String = ""
 
     private let claudeService = ClaudeAPIService()
-    private let priceService = PriceLookupService()
+    private let ebayService = EbayAPIService()
 
     // MARK: - Batch Analysis
 
@@ -158,7 +158,8 @@ class AIEnrichmentService: ObservableObject {
         // Search eBay for similar items
         let searchQuery = "\(item.brand ?? "") \(item.model ?? "") \(item.itemName)".trimmingCharacters(in: .whitespaces)
 
-        let ebayData = try await priceService.fetchEbayPricing(query: searchQuery)
+        // Use real eBay API service
+        let ebayData = try await ebayService.fetchRealPricing(query: searchQuery, category: item.category)
 
         enrichedItem.ebayAveragePrice = ebayData.averagePrice
         enrichedItem.ebayRecentSales = ebayData.recentSales
@@ -262,77 +263,8 @@ class AIEnrichmentService: ObservableObject {
     }
 }
 
-// MARK: - Price Lookup Service
-
-class PriceLookupService {
-    struct EbayPricingData {
-        var averagePrice: Double?
-        var recentSales: [EbaySale]
-        var listingCount: Int
-    }
-
-    func fetchEbayPricing(query: String) async throws -> EbayPricingData {
-        // For now, we'll simulate eBay data
-        // In production, you would:
-        // 1. Use eBay Finding API (requires API key)
-        // 2. Or web scraping (against ToS, not recommended)
-        // 3. Or use a pricing database API
-
-        // Simulated data for demo
-        // TODO: Implement real eBay API integration
-        return simulateEbayData(for: query)
-    }
-
-    private func simulateEbayData(for query: String) -> EbayPricingData {
-        // Simulate realistic pricing based on common items
-        let randomVariation = Double.random(in: 0.8...1.2)
-        let basePrice = estimateBasePrice(from: query) * randomVariation
-
-        let recentSales = (0..<3).map { index in
-            EbaySale(
-                title: query,
-                price: basePrice * Double.random(in: 0.9...1.1),
-                saleDate: Calendar.current.date(byAdding: .day, value: -index * 7, to: Date())!,
-                condition: ["Excellent", "Good", "Used"].randomElement()
-            )
-        }
-
-        return EbayPricingData(
-            averagePrice: basePrice,
-            recentSales: recentSales,
-            listingCount: Int.random(in: 10...100)
-        )
-    }
-
-    private func estimateBasePrice(from query: String) -> Double {
-        let q = query.lowercased()
-
-        // Electronics
-        if q.contains("iphone") {
-            if q.contains("15") || q.contains("14") { return 600 }
-            if q.contains("13") || q.contains("12") { return 400 }
-            return 250
-        }
-        if q.contains("ipad") { return 350 }
-        if q.contains("macbook") { return 800 }
-        if q.contains("xbox") || q.contains("playstation") || q.contains("ps5") { return 350 }
-
-        // Watches
-        if q.contains("rolex") { return 8000 }
-        if q.contains("omega") { return 3000 }
-        if q.contains("apple watch") { return 250 }
-
-        // Jewelry
-        if q.contains("gold") && q.contains("ring") { return 500 }
-        if q.contains("diamond") { return 1200 }
-
-        // Tools
-        if q.contains("drill") || q.contains("saw") { return 100 }
-
-        // Default
-        return 150
-    }
-}
+// NOTE: PriceLookupService has been replaced with EbayAPIService
+// See EbayAPIService.swift for real eBay Finding API integration
 
 // MARK: - Claude Service Extension
 
