@@ -3,9 +3,49 @@
 //  PawnShopAssistant
 //
 //  Configuration file for API keys and settings
-//  Copy this file to Config.xcconfig and add your actual API key
+//  Copy this file to Config.xcconfig and add your actual API keys
 //
 
-// Claude API Key
+// ============================================
+// REQUIRED: Claude API Key
+// ============================================
 // Get your API key from: https://console.anthropic.com/
+// Free trial available, then pay-as-you-go
+// Cost: ~$0.01-0.03 per analysis
 CLAUDE_API_KEY = your_claude_api_key_here
+
+// ============================================
+// OPTIONAL: eBay API Key
+// ============================================
+// Get your App ID from: https://developer.ebay.com/
+// Sign up for free developer account
+// Create app → Get App ID
+// FREE: 5,000 calls/day
+//
+// If not configured, app uses intelligent price simulation
+EBAY_APP_ID = your_ebay_app_id_here
+
+// ============================================
+// OPTIONAL: Firebase (for multi-user)
+// ============================================
+// No keys needed here - uses GoogleService-Info.plist
+// Download from Firebase Console after creating project
+// Free tier: 50K reads, 20K writes, 10GB storage/day
+
+// ============================================
+// INSTRUCTIONS
+// ============================================
+// 1. Copy this file:
+//    cp Config.xcconfig.example Config.xcconfig
+//
+// 2. Edit Config.xcconfig with your keys
+//
+// 3. NEVER commit Config.xcconfig to git
+//    (it's already in .gitignore)
+//
+// 4. In Info.plist, add:
+//    <key>CLAUDE_API_KEY</key>
+//    <string>$(CLAUDE_API_KEY)</string>
+//
+//    <key>EBAY_APP_ID</key>
+//    <string>$(EBAY_APP_ID)</string>
